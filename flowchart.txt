@@ -1,0 +1,69 @@
+DroneBot 2026 – System Flowchart
+=================================
+
+[START]
+   |
+   v
+[PC: Open video source]
+   |  (RTSP / HTTP / file / camera / fallback: sample_video.mp4 / sample_frames/)
+   |
+   v
+[PC: Read frame]
+   |
+   +--[no frame]---> [END / reconnect]
+   |
+   v
+[PC: Detect fire (HSV threshold + morphology + contour)]
+   |
+   +--[no fire]---> [send cmd=stop, duration=0]
+   |
+   v
+[PC: Estimate centroid of fire blob]
+   |
+   v
+[PC: ArUco detection (optional pose estimation)]
+   |
+   v
+[PC: PID controller]
+   |  error = frame_centre_x - fire_centroid_x
+   |  pid.update(error, dt)
+   |
+   v
+[PC: navigation.decide_command(pid_output)]
+   |  -> { cmd: forward | left | right | stop, duration: float }
+   |
+   v
+[PC: ws_client.send_command(msg)]
+   |  (with msg_id, ack wait, retry on failure, heartbeat)
+   |
+   v
+[Pi: WebSocket server receives JSON command]
+   |
+   +--[cmd == emergency_stop]--> [gpio.stop_all(); set ESTOP flag; ignore further movement]
+   |
+   +--[cmd == heartbeat / ping]--> [send pong; continue]
+   |
+   v
+[Pi: gpio_controller.press_button(cmd, duration)]
+   |  (thread-safe; real RPi.GPIO or MockGPIO)
+   |
+   v
+[Pi: send ACK { msg_id, status: ok }]
+   |
+   v
+[PC: receive ACK; log]
+   |
+   v
+[PC: save debug frame with overlays to pc/debug/]
+   |
+   v
+[LOOP -> Read next frame]
+
+=================================
+Emergency Stop path (any time):
+  Pi receives { "cmd": "emergency_stop" }
+    -> stop_all()
+    -> ESTOP = True
+    -> all subsequent movement commands rejected (ACK with status=rejected)
+    -> restart process to resume
+=================================

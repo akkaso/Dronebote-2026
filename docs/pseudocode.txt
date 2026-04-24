@@ -1,0 +1,113 @@
+DroneBot 2026 – Pseudocode
+==========================
+
+── PC SIDE ────────────────────────────────────────────────────────────
+
+PROCEDURE vision_loop(source, ws_url, config):
+    pid    ← PIDController(kp, ki, kd)
+    aruco  ← ArucoDetector()
+    ws     ← WSClient(ws_url)
+    cap    ← open_video(source) OR fallback_video()
+    timer  ← FPSTimer()
+
+    LOOP forever:
+        frame ← cap.read()
+        IF frame is None:
+            BREAK
+
+        dt ← timer.tick()
+
+        fire_found, centroid, mask ← detect_fire(frame, hsv_lower, hsv_upper)
+
+        IF fire_found:
+            error ← centroid.x - frame_width / 2
+        ELSE:
+            error ← 0
+            pid.reset()
+
+        pid_out ← pid.update(error, dt)
+
+        command ← decide_command(pid_out, fire_found)
+
+        corners, ids ← aruco.detect(frame)
+
+        AWAIT ws.send_command(command)
+
+        debug_frame ← annotate(frame, centroid, command, fps)
+        IF debug_save:
+            save(debug_frame)
+
+        IF key == 'q': BREAK
+
+    ws.close()
+    cap.release()
+
+
+PROCEDURE detect_fire(frame, lower, upper):
+    hsv  ← cv2.cvtColor(frame, HSV)
+    mask ← cv2.inRange(hsv, lower, upper)
+    mask ← morphology_open(mask)
+    mask ← morphology_dilate(mask)
+    contours ← findContours(mask)
+    IF contours is empty OR max_area < min_area:
+        RETURN False, None, mask
+    centroid ← moments(largest_contour)
+    RETURN True, centroid, mask
+
+
+PROCEDURE decide_command(pid_out, fire_found):
+    IF NOT fire_found:
+        RETURN { cmd: "stop", duration: 0 }
+    IF |pid_out| < turn_threshold:
+        RETURN { cmd: "forward", duration: base_duration }
+    ELIF pid_out > 0:
+        RETURN { cmd: "right",   duration: proportional_duration }
+    ELSE:
+        RETURN { cmd: "left",    duration: proportional_duration }
+
+
+── PI SIDE ────────────────────────────────────────────────────────────
+
+PROCEDURE ws_server(host, port, mock):
+    gpio  ← MockGPIO() IF mock ELSE RealGPIO()
+    estop ← False
+
+    LISTEN on host:port
+    FOR EACH connected client:
+        FOR EACH message:
+            msg ← parse_json(message)
+
+            IF msg.cmd == "emergency_stop":
+                gpio.stop_all()
+                estop ← True
+                SEND ACK(ok)
+                CONTINUE
+
+            IF msg.cmd == "heartbeat":
+                SEND ACK(ok)
+                CONTINUE
+
+            IF estop:
+                SEND ACK(rejected)
+                CONTINUE
+
+            IF msg.cmd IN movement_commands:
+                RUN_IN_THREAD gpio.press_button(msg.cmd, msg.duration)
+                SEND ACK(ok)
+            ELSE:
+                SEND ACK(rejected)
+
+
+PROCEDURE press_button(button, duration):
+    CLAMP duration to [0, MAX_PRESS_TIMEOUT]
+    WITH lock:
+        set_pin(button, HIGH)
+    SLEEP(duration)
+    WITH lock:
+        set_pin(button, LOW)
+
+
+PROCEDURE stop_all():
+    WITH lock:
+        FOR EACH pin:
+            set_pin(pin, LOW)

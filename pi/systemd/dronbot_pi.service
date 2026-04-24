@@ -1,0 +1,14 @@
+[Unit]
+Description=DroneBot 2026 Pi WebSocket Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Dronebote-2026
+ExecStart=/home/pi/Dronebote-2026/.venv-pi/bin/python3 pi/pi_ws_server.py --host 0.0.0.0 --port 8765
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

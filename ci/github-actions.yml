@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PC dependencies
+        run: pip install -r requirements-pc.txt
+
+      - name: Run PC tests
+        run: pytest pc/tests/ -v
+
+      - name: Run Pi tests (mock – no hardware)
+        run: pytest pi/tests/ -v
