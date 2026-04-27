@@ -1,15 +1,15 @@
 """
-GPIO controller for DroneBot 2026 (Pi side).
+Controllore GPIO per DroneBot 2026 (lato Pi).
 
-Provides
+Fornisce
 --------
-- ``RealGPIO``  – uses RPi.GPIO (only works on a Raspberry Pi)
-- ``MockGPIO``  – thread-safe stub for testing without hardware
-- ``get_controller(mock=False)`` – factory function
+- ``RealGPIO``  – usa RPi.GPIO (funziona solo su Raspberry Pi)
+- ``MockGPIO``  – stub thread-safe per test senza hardware
+- ``get_controller(mock=False)`` – funzione factory
 
-Both classes expose:
-    press_button(button: str, duration: float) -> None
-    stop_all() -> None
+Entrambe le classi espongono:
+    premi_pulsante(pulsante: str, durata: float) -> None
+    ferma_tutto() -> None
 """
 
 from __future__ import annotations
@@ -20,65 +20,65 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# ── Button → GPIO BCM pin mapping ────────────────────────────────────
+# ── Mappa pulsante → pin GPIO BCM ────────────────────────────────────
 BUTTON_PINS: dict[str, int] = {
-    "forward": 17,
-    "left":    27,
-    "right":   22,
-    "back":    10,
-    "stop":     9,  # optional dedicated stop button
+    "forward": 17,  # avanti
+    "left":    27,  # sinistra
+    "right":   22,  # destra
+    "back":    10,  # indietro
+    "stop":     9,  # stop (pulsante dedicato opzionale)
 }
 
-# Maximum time (seconds) a single button press can be held
+# Tempo massimo (secondi) per cui un singolo pulsante può essere tenuto premuto
 MAX_PRESS_TIMEOUT: float = 5.0
 
 
 class MockGPIO:
     """
-    Thread-safe mock GPIO controller for tests and development.
+    Controllore GPIO mock thread-safe per test e sviluppo.
 
-    Records all calls in ``self.log`` so tests can assert on behaviour.
+    Registra tutte le chiamate in ``self.log`` così i test possono verificare il comportamento.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.log: list[dict] = []
-        self._active: set[str] = set()
-        logger.info("MockGPIO initialised.")
+        self._attivi: set[str] = set()
+        logger.info("MockGPIO inizializzato.")
 
-    def press_button(self, button: str, duration: float) -> None:
+    def press_button(self, pulsante: str, durata: float) -> None:
         """
-        Simulate pressing *button* for *duration* seconds.
+        Simula la pressione di *pulsante* per *durata* secondi.
 
-        Clamps *duration* to [0, MAX_PRESS_TIMEOUT].
-        Thread-safe: only one button active at a time.
+        Limita *durata* a [0, MAX_PRESS_TIMEOUT].
+        Thread-safe: un solo pulsante attivo alla volta.
         """
-        duration = max(0.0, min(duration, MAX_PRESS_TIMEOUT))
+        durata = max(0.0, min(durata, MAX_PRESS_TIMEOUT))
         with self._lock:
-            logger.info("[MockGPIO] press_button(%s, %.3fs)", button, duration)
-            self._active.add(button)
-            self.log.append({"action": "press", "button": button, "duration": duration})
+            logger.info("[MockGPIO] press_button(%s, %.3fs)", pulsante, durata)
+            self._attivi.add(pulsante)
+            self.log.append({"action": "press", "button": pulsante, "duration": durata})
 
-        time.sleep(duration)
+        time.sleep(durata)
 
         with self._lock:
-            self._active.discard(button)
-            self.log.append({"action": "release", "button": button})
+            self._attivi.discard(pulsante)
+            self.log.append({"action": "release", "button": pulsante})
 
     def stop_all(self) -> None:
-        """Simulate releasing all buttons immediately."""
+        """Simula il rilascio immediato di tutti i pulsanti."""
         with self._lock:
             logger.info("[MockGPIO] stop_all")
-            self._active.clear()
+            self._attivi.clear()
             self.log.append({"action": "stop_all"})
 
 
 class RealGPIO:
     """
-    Real RPi.GPIO controller.
+    Controllore RPi.GPIO reale.
 
-    Requires the ``RPi.GPIO`` package (available on a Raspberry Pi).
-    Raises ``ImportError`` if not running on supported hardware.
+    Richiede il pacchetto ``RPi.GPIO`` (disponibile su Raspberry Pi).
+    Solleva ``ImportError`` se non è in esecuzione su hardware supportato.
     """
 
     def __init__(self) -> None:
@@ -86,7 +86,7 @@ class RealGPIO:
             import RPi.GPIO as GPIO  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(
-                "RPi.GPIO is not available. Run with --mock on non-Pi hardware."
+                "RPi.GPIO non è disponibile. Avvia con --mock su hardware non-Pi."
             ) from exc
 
         self._GPIO = GPIO
@@ -95,46 +95,47 @@ class RealGPIO:
         GPIO.setmode(GPIO.BCM)
         for pin in BUTTON_PINS.values():
             GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
-        logger.info("RealGPIO initialised (BCM mode).")
+        logger.info("RealGPIO inizializzato (modalità BCM).")
 
-    def _set_pin(self, button: str, state: bool) -> None:
-        pin = BUTTON_PINS.get(button)
+    def _imposta_pin(self, pulsante: str, stato: bool) -> None:
+        pin = BUTTON_PINS.get(pulsante)
         if pin is None:
-            logger.warning("Unknown button: %s", button)
+            logger.warning("Pulsante sconosciuto: %s", pulsante)
             return
-        self._GPIO.output(pin, self._GPIO.HIGH if state else self._GPIO.LOW)
+        self._GPIO.output(pin, self._GPIO.HIGH if stato else self._GPIO.LOW)
 
-    def press_button(self, button: str, duration: float) -> None:
+    def press_button(self, pulsante: str, durata: float) -> None:
         """
-        Press *button* GPIO pin HIGH for *duration* seconds, then release.
+        Porta il pin GPIO di *pulsante* HIGH per *durata* secondi, poi lo abbassa.
 
-        Thread-safe, duration clamped to MAX_PRESS_TIMEOUT.
+        Thread-safe, durata limitata a MAX_PRESS_TIMEOUT.
         """
-        duration = max(0.0, min(duration, MAX_PRESS_TIMEOUT))
+        durata = max(0.0, min(durata, MAX_PRESS_TIMEOUT))
         with self._lock:
-            logger.info("[RealGPIO] press_button(%s, %.3fs)", button, duration)
-            self._set_pin(button, True)
+            logger.info("[RealGPIO] press_button(%s, %.3fs)", pulsante, durata)
+            self._imposta_pin(pulsante, True)
 
-        time.sleep(duration)
+        time.sleep(durata)
 
         with self._lock:
-            self._set_pin(button, False)
+            self._imposta_pin(pulsante, False)
 
     def stop_all(self) -> None:
-        """Set all GPIO pins LOW immediately."""
+        """Porta immediatamente tutti i pin GPIO a LOW."""
         with self._lock:
             logger.info("[RealGPIO] stop_all")
-            for button in BUTTON_PINS:
-                self._set_pin(button, False)
+            for pulsante in BUTTON_PINS:
+                self._imposta_pin(pulsante, False)
 
     def cleanup(self) -> None:
-        """Release GPIO resources (call on shutdown)."""
+        """Rilascia le risorse GPIO (chiamare alla chiusura)."""
         self.stop_all()
         self._GPIO.cleanup()
 
 
 def get_controller(mock: bool = False) -> MockGPIO | RealGPIO:
-    """Return a MockGPIO or RealGPIO depending on *mock* flag."""
+    """Restituisce MockGPIO o RealGPIO in base al flag *mock*."""
     if mock:
         return MockGPIO()
     return RealGPIO()
+

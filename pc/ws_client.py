@@ -1,12 +1,12 @@
 """
-Robust WebSocket client for DroneBot 2026 (PC side).
+Client WebSocket robusto per DroneBot 2026 (lato PC).
 
-Features
---------
-- Sends JSON commands with a unique ``msg_id``.
-- Waits for ACK from the Pi server; retries on timeout.
-- Periodic heartbeat ping to detect dead connections.
-- Mock mode (no network needed) for testing without hardware.
+Funzionalità
+------------
+- Invia comandi JSON con un ``msg_id`` univoco.
+- Attende l'ACK dal server Pi; riprova in caso di timeout.
+- Ping heartbeat periodico per rilevare connessioni interrotte.
+- Modalità mock (nessuna rete) per test senza hardware.
 """
 
 from __future__ import annotations
@@ -21,23 +21,23 @@ from pc.utils import get_logger
 
 logger = get_logger(__name__)
 
-# How long to wait for an ACK before retrying (seconds)
-ACK_TIMEOUT = 3.0
-# Max number of send retries per command
-MAX_RETRIES = 3
-# Heartbeat interval (seconds)
-HEARTBEAT_INTERVAL = 5.0
+# Tempo di attesa per un ACK prima di riprovare (secondi)
+TIMEOUT_ACK = 3.0
+# Numero massimo di tentativi di invio per comando
+MAX_TENTATIVI = 3
+# Intervallo heartbeat (secondi)
+INTERVALLO_HEARTBEAT = 5.0
 
 
 class MockWSClient:
-    """Fake client that logs commands instead of sending them."""
+    """Client finto che registra i comandi invece di inviarli."""
 
     def __init__(self) -> None:
         self.connected = True
         self.sent: list[dict] = []
 
     async def send_command(self, payload: dict) -> bool:
-        """Log the command and return success."""
+        """Registra il comando e restituisce successo."""
         msg_id = payload.get("msg_id", str(uuid.uuid4())[:8])
         payload.setdefault("msg_id", msg_id)
         self.sent.append(payload)
@@ -50,10 +50,10 @@ class MockWSClient:
 
 class WSClient:
     """
-    WebSocket client that connects to the Pi server.
+    Client WebSocket che si connette al server Pi.
 
-    Usage
-    -----
+    Utilizzo
+    --------
     async with WSClient("ws://pi-host:8765") as client:
         await client.send_command({"cmd": "forward", "duration": 0.5})
     """
@@ -61,26 +61,26 @@ class WSClient:
     def __init__(self, url: str) -> None:
         self.url = url
         self._ws = None
-        self._heartbeat_task: asyncio.Task | None = None
+        self._task_heartbeat: asyncio.Task | None = None
         self.connected = False
 
     async def connect(self) -> None:
-        """Open the WebSocket connection and start the heartbeat."""
-        import websockets  # imported here so mock mode works without websockets
+        """Apre la connessione WebSocket e avvia l'heartbeat."""
+        import websockets  # importato qui così la modalità mock funziona senza websockets
 
         self._ws = await websockets.connect(self.url)
         self.connected = True
-        logger.info("Connected to %s", self.url)
-        self._heartbeat_task = asyncio.create_task(self._heartbeat())
+        logger.info("Connesso a %s", self.url)
+        self._task_heartbeat = asyncio.create_task(self._heartbeat())
 
     async def close(self) -> None:
-        """Cleanly close the connection."""
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
+        """Chiude la connessione in modo pulito."""
+        if self._task_heartbeat:
+            self._task_heartbeat.cancel()
         if self._ws:
             await self._ws.close()
         self.connected = False
-        logger.info("WebSocket closed.")
+        logger.info("WebSocket chiuso.")
 
     async def __aenter__(self) -> "WSClient":
         await self.connect()
@@ -90,51 +90,52 @@ class WSClient:
         await self.close()
 
     async def _heartbeat(self) -> None:
-        """Send periodic pings to keep the connection alive."""
+        """Invia ping periodici per mantenere attiva la connessione."""
         while True:
-            await asyncio.sleep(HEARTBEAT_INTERVAL)
+            await asyncio.sleep(INTERVALLO_HEARTBEAT)
             try:
                 await self._ws.ping()
-                logger.debug("Heartbeat ping sent.")
+                logger.debug("Ping heartbeat inviato.")
             except Exception as exc:
-                logger.warning("Heartbeat failed: %s", exc)
+                logger.warning("Heartbeat fallito: %s", exc)
                 break
 
     async def send_command(self, payload: dict) -> bool:
         """
-        Send a command dict and wait for ACK.
+        Invia un dict di comando e attende l'ACK.
 
-        Retries up to MAX_RETRIES times if no ACK is received.
+        Riprova fino a MAX_TENTATIVI volte se non si riceve ACK.
 
-        Returns True on success, False on failure.
+        Restituisce True in caso di successo, False in caso di fallimento.
         """
         if not self.connected or self._ws is None:
-            logger.error("Not connected; cannot send command.")
+            logger.error("Non connesso; impossibile inviare il comando.")
             return False
 
         payload = dict(payload)
         payload.setdefault("msg_id", str(uuid.uuid4()))
 
-        for attempt in range(1, MAX_RETRIES + 1):
+        for tentativo in range(1, MAX_TENTATIVI + 1):
             try:
                 await self._ws.send(json.dumps(payload))
-                logger.debug("Sent (attempt %d): %s", attempt, payload)
+                logger.debug("Inviato (tentativo %d): %s", tentativo, payload)
 
-                # Wait for ACK
+                # Attendi ACK
                 try:
-                    raw = await asyncio.wait_for(self._ws.recv(), timeout=ACK_TIMEOUT)
+                    raw = await asyncio.wait_for(self._ws.recv(), timeout=TIMEOUT_ACK)
                     ack = json.loads(raw)
                     if ack.get("msg_id") == payload["msg_id"]:
-                        status = ack.get("status", "ok")
-                        logger.info("ACK received: %s (status=%s)", payload["msg_id"], status)
-                        return status != "rejected"
-                    # Wrong msg_id — ignore and retry
-                    logger.warning("ACK msg_id mismatch; retrying.")
+                        stato = ack.get("status", "ok")
+                        logger.info("ACK ricevuto: %s (stato=%s)", payload["msg_id"], stato)
+                        return stato != "rejected"
+                    # msg_id errato — ignora e riprova
+                    logger.warning("msg_id ACK non corrispondente; riprovo.")
                 except asyncio.TimeoutError:
-                    logger.warning("ACK timeout (attempt %d/%d)", attempt, MAX_RETRIES)
+                    logger.warning("Timeout ACK (tentativo %d/%d)", tentativo, MAX_TENTATIVI)
             except Exception as exc:
-                logger.error("Send error: %s", exc)
+                logger.error("Errore di invio: %s", exc)
                 return False
 
-        logger.error("Failed to get ACK after %d attempts.", MAX_RETRIES)
+        logger.error("Impossibile ricevere ACK dopo %d tentativi.", MAX_TENTATIVI)
         return False
+

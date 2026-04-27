@@ -1,19 +1,19 @@
 """
-DroneBot 2026 – Pi WebSocket server.
+DroneBot 2026 – Server WebSocket Pi.
 
-Accepts JSON commands from the PC client:
+Accetta comandi JSON dal client PC:
     { "cmd": "forward"|"left"|"right"|"back"|"stop", "duration": float, "msg_id": str }
 
-Special commands:
-    { "cmd": "emergency_stop" }  – stops all motors, enters ESTOP state (ignores
-                                    further movement until restart)
-    { "cmd": "heartbeat" }       – replies with pong (no GPIO action)
+Comandi speciali:
+    { "cmd": "emergency_stop" }  – ferma tutti i motori, entra in stato ESTOP (ignora
+                                    ulteriori movimenti fino al riavvio)
+    { "cmd": "heartbeat" }       – risponde con pong (nessuna azione GPIO)
 
-Sends ACK:
+Invia ACK:
     { "msg_id": str, "status": "ok" | "rejected" }
 
-Usage
------
+Utilizzo
+--------
 python3 pi_ws_server.py [--host HOST] [--port PORT] [--mock]
 """
 
@@ -38,104 +38,105 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pi_ws_server")
 
-# Movement commands that the GPIO controller handles
-MOVEMENT_COMMANDS = {"forward", "left", "right", "back", "stop"}
+# Comandi di movimento gestiti dal controllore GPIO
+COMANDI_MOVIMENTO = {"forward", "left", "right", "back", "stop"}
 
-# Global emergency-stop flag (set on emergency_stop command)
+# Flag di arresto di emergenza globale (impostato dal comando emergency_stop)
 _ESTOP = False
-_gpio = None  # initialised in main()
+_gpio = None  # inizializzato in main()
 
 
-async def handle_client(ws: WebSocketServerProtocol) -> None:
-    """Handle a single connected PC client."""
+async def gestisci_client(ws: WebSocketServerProtocol) -> None:
+    """Gestisce un singolo client PC connesso."""
     global _ESTOP
 
-    client_addr = ws.remote_address
-    logger.info("Client connected: %s", client_addr)
+    indirizzo_client = ws.remote_address
+    logger.info("Client connesso: %s", indirizzo_client)
 
     try:
         async for raw in ws:
-            # ── Parse JSON ───────────────────────────────────────────
+            # ── Analisi JSON ──────────────────────────────────────────
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                logger.warning("Invalid JSON from %s: %r", client_addr, raw)
+                logger.warning("JSON non valido da %s: %r", indirizzo_client, raw)
                 continue
 
             cmd = msg.get("cmd", "")
             msg_id = msg.get("msg_id", "")
-            duration = float(msg.get("duration", 0.0))
+            durata = float(msg.get("duration", 0.0))
 
-            logger.info("Received cmd=%r msg_id=%r duration=%.3f", cmd, msg_id, duration)
+            logger.info("Ricevuto cmd=%r msg_id=%r durata=%.3f", cmd, msg_id, durata)
 
-            # ── Emergency stop ───────────────────────────────────────
+            # ── Arresto di emergenza ──────────────────────────────────
             if cmd == "emergency_stop":
-                logger.warning("EMERGENCY STOP received!")
+                logger.warning("ARRESTO DI EMERGENZA ricevuto!")
                 _gpio.stop_all()
                 _ESTOP = True
-                await _send_ack(ws, msg_id, "ok")
+                await _invia_ack(ws, msg_id, "ok")
                 continue
 
-            # ── Heartbeat ────────────────────────────────────────────
+            # ── Heartbeat ─────────────────────────────────────────────
             if cmd == "heartbeat":
-                await _send_ack(ws, msg_id, "ok")
+                await _invia_ack(ws, msg_id, "ok")
                 continue
 
-            # ── ESTOP active – reject movement ───────────────────────
+            # ── ESTOP attivo – rifiuta il movimento ───────────────────
             if _ESTOP:
-                logger.warning("ESTOP active – rejecting cmd=%r", cmd)
-                await _send_ack(ws, msg_id, "rejected")
+                logger.warning("ESTOP attivo – rifiuto cmd=%r", cmd)
+                await _invia_ack(ws, msg_id, "rejected")
                 continue
 
-            # ── Movement commands ────────────────────────────────────
-            if cmd in MOVEMENT_COMMANDS:
-                # Run GPIO in a thread so we don't block the event loop
+            # ── Comandi di movimento ──────────────────────────────────
+            if cmd in COMANDI_MOVIMENTO:
+                # Esegui GPIO in un thread separato per non bloccare l'event loop
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
-                    None, _gpio.press_button, cmd, duration
+                    None, _gpio.press_button, cmd, durata
                 )
-                await _send_ack(ws, msg_id, "ok")
+                await _invia_ack(ws, msg_id, "ok")
             else:
-                logger.warning("Unknown command: %r", cmd)
-                await _send_ack(ws, msg_id, "rejected")
+                logger.warning("Comando sconosciuto: %r", cmd)
+                await _invia_ack(ws, msg_id, "rejected")
 
     except websockets.exceptions.ConnectionClosedOK:
-        logger.info("Client %s disconnected cleanly.", client_addr)
+        logger.info("Client %s disconnesso in modo pulito.", indirizzo_client)
     except websockets.exceptions.ConnectionClosedError as exc:
-        logger.warning("Client %s connection error: %s", client_addr, exc)
+        logger.warning("Errore connessione client %s: %s", indirizzo_client, exc)
     finally:
-        logger.info("Handler for %s finished.", client_addr)
+        logger.info("Handler per %s terminato.", indirizzo_client)
 
 
-async def _send_ack(ws: WebSocketServerProtocol, msg_id: str, status: str) -> None:
-    """Send a JSON ACK message."""
+async def _invia_ack(ws: WebSocketServerProtocol, msg_id: str, stato: str) -> None:
+    """Invia un messaggio ACK JSON."""
     try:
-        await ws.send(json.dumps({"msg_id": msg_id, "status": status}))
+        await ws.send(json.dumps({"msg_id": msg_id, "status": stato}))
     except Exception as exc:
-        logger.error("Failed to send ACK: %s", exc)
+        logger.error("Impossibile inviare ACK: %s", exc)
 
 
-async def serve(host: str, port: int) -> None:
-    logger.info("Starting WebSocket server on %s:%d (ESTOP=%s)", host, port, _ESTOP)
-    async with websockets.serve(handle_client, host, port):
-        await asyncio.Future()  # run forever
+async def avvia_server(host: str, port: int) -> None:
+    logger.info("Avvio server WebSocket su %s:%d (ESTOP=%s)", host, port, _ESTOP)
+    async with websockets.serve(gestisci_client, host, port):
+        await asyncio.Future()  # esegui per sempre
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="DroneBot 2026 Pi WebSocket server")
-    p.add_argument("--host", default="0.0.0.0", help="Bind host")
-    p.add_argument("--port", type=int, default=8765, help="Bind port")
-    p.add_argument("--mock", action="store_true", help="Use MockGPIO (no hardware needed)")
+def analizza_argomenti() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="DroneBot 2026 – Server WebSocket Pi")
+    p.add_argument("--host", default="0.0.0.0", help="Host di ascolto")
+    p.add_argument("--port", type=int, default=8765, help="Porta di ascolto")
+    p.add_argument("--mock", action="store_true", help="Usa MockGPIO (nessun hardware necessario)")
     return p.parse_args()
 
 
 def main() -> None:
     global _gpio
-    args = parse_args()
+    args = analizza_argomenti()
     _gpio = get_controller(mock=args.mock)
-    logger.info("GPIO controller: %s", type(_gpio).__name__)
-    asyncio.run(serve(args.host, args.port))
+    logger.info("Controllore GPIO: %s", type(_gpio).__name__)
+    asyncio.run(avvia_server(args.host, args.port))
 
 
 if __name__ == "__main__":
     main()
+

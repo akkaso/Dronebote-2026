@@ -1,29 +1,30 @@
-# DroneBot 2026 – PC configuration
-# All values here override the hard-coded defaults in vision_client.py
+# DroneBot 2026 – Configurazione lato PC
+# I valori qui presenti sovrascrivono i default hardcoded in vision_client.py
 
-# ── Fire detection (HSV) ────────────────────────────────────────────
-# Hue: 0-30 covers orange/red fire colours
+# ── Rilevamento fuoco (HSV) ─────────────────────────────────────────
+# Tonalità: 0-30 copre i colori arancione/rosso del fuoco
 fire_hsv_lower: [0, 120, 120]
 fire_hsv_upper: [30, 255, 255]
-min_contour_area: 500        # pixels² – smaller blobs are ignored
+min_contour_area: 500        # pixel² – blob più piccoli vengono ignorati
 
-# ── PID gains ───────────────────────────────────────────────────────
+# ── Guadagni PID ────────────────────────────────────────────────────
 pid_kp: 0.8
 pid_ki: 0.05
 pid_kd: 0.1
 pid_windup_limit: 300.0
 pid_output_limit: 500.0
 
-# ── Navigation ──────────────────────────────────────────────────────
-turn_threshold: 40           # px – inside this band → go forward
-base_duration: 0.3           # s  – minimum command duration
+# ── Navigazione ─────────────────────────────────────────────────────
+turn_threshold: 40           # px – entro questa soglia → va dritto
+base_duration: 0.3           # s  – durata minima del comando
 
 # ── WebSocket ───────────────────────────────────────────────────────
 ws_url: "ws://localhost:8765"
 
-# ── Video source ────────────────────────────────────────────────────
-camera_index: 0              # used when --source is not provided
+# ── Sorgente video ──────────────────────────────────────────────────
+camera_index: 0              # usato quando --source non è specificato
 
 # ── Debug ───────────────────────────────────────────────────────────
-debug_save: true             # save annotated frames to pc/debug/
-display: true                # show OpenCV imshow window
+debug_save: true             # salva i frame annotati in pc/debug/
+display: true                # mostra la finestra OpenCV imshow
+

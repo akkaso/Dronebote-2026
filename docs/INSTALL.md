@@ -1,16 +1,16 @@
-# Installation Guide – DroneBot 2026
+# Guida all'Installazione – DroneBot 2026
 
-## Prerequisites
+## Prerequisiti
 
-| Component | Minimum version |
-|-----------|----------------|
-| Python    | 3.10            |
-| pip       | 23              |
-| Git       | 2.x             |
+| Componente | Versione minima |
+|------------|----------------|
+| Python     | 3.10            |
+| pip        | 23              |
+| Git        | 2.x             |
 
 ---
 
-## 1. Clone the repository
+## 1. Clona la repository
 
 ```bash
 git clone https://github.com/akkaso/Dronebote-2026.git
@@ -19,7 +19,7 @@ cd Dronebote-2026
 
 ---
 
-## 2. PC setup (development machine / laptop)
+## 2. Configurazione PC (portatile / desktop di sviluppo)
 
 ```bash
 python3 -m venv .venv-pc
@@ -27,7 +27,7 @@ source .venv-pc/bin/activate      # Windows: .venv-pc\Scripts\activate
 pip install -r requirements-pc.txt
 ```
 
-Verify:
+Verifica l'installazione:
 
 ```bash
 python3 -c "import cv2, numpy, websockets, yaml; print('OK')"
@@ -35,15 +35,15 @@ python3 -c "import cv2, numpy, websockets, yaml; print('OK')"
 
 ---
 
-## 3. Raspberry Pi setup
+## 3. Configurazione Raspberry Pi
 
-Copy the repository to the Pi:
+Copia la repository sul Pi:
 
 ```bash
-scp -r . pi@<PI_IP>:/home/pi/Dronebote-2026
+scp -r . pi@<IP_DEL_PI>:/home/pi/Dronebote-2026
 ```
 
-On the Pi:
+Sul Raspberry Pi:
 
 ```bash
 cd /home/pi/Dronebote-2026
@@ -54,44 +54,44 @@ pip install -r requirements-pi.txt
 
 ---
 
-## 4. GPIO wiring (Raspberry Pi)
+## 4. Cablaggio GPIO (Raspberry Pi)
 
-| Function | BCM pin |
+| Funzione | Pin BCM |
 |----------|---------|
-| Forward  | 17      |
-| Left     | 27      |
-| Right    | 22      |
-| Back     | 10      |
+| Avanti   | 17      |
+| Sinistra | 27      |
+| Destra   | 22      |
+| Indietro | 10      |
 | Stop     | 9       |
 
-Connect each pin through a suitable driver circuit (e.g. L298N motor driver).
+Collega ogni pin tramite un circuito driver adeguato (es. driver motori L298N).
 
 ---
 
-## 5. Run with Docker (optional)
+## 5. Avvio con Docker (opzionale)
 
 ```bash
 docker-compose up --build
 ```
 
-This starts the Pi mock server and PC mock client automatically.
+Questo comando avvia automaticamente il server Pi mock e il client PC mock.
 
 ---
 
-## 6. Run tests
+## 6. Esecuzione dei test
 
 ```bash
-# PC tests
+# Test PC
 pip install -r requirements-pc.txt
 pytest pc/tests/
 
-# Pi tests (mock – no hardware needed)
+# Test Pi (mock – nessun hardware necessario)
 pytest pi/tests/
 ```
 
 ---
 
-## 7. systemd service (Raspberry Pi auto-start)
+## 7. Servizio systemd (avvio automatico su Raspberry Pi)
 
 ```bash
 sudo cp pi/systemd/dronbot_pi.service /etc/systemd/system/
@@ -99,3 +99,4 @@ sudo systemctl daemon-reload
 sudo systemctl enable dronbot_pi
 sudo systemctl start dronbot_pi
 ```
+

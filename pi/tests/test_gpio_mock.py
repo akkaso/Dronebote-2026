@@ -1,4 +1,4 @@
-"""Tests for the MockGPIO controller."""
+"""Test per il controllore MockGPIO."""
 
 import sys
 import time
@@ -15,55 +15,56 @@ class TestMockGPIO:
     def setup_method(self):
         self.gpio = MockGPIO()
 
-    def test_press_button_logs_press_and_release(self):
+    def test_press_button_registra_pressione_e_rilascio(self):
         self.gpio.press_button("forward", 0.01)
-        actions = [e["action"] for e in self.gpio.log]
-        assert "press" in actions
-        assert "release" in actions
+        azioni = [e["action"] for e in self.gpio.log]
+        assert "press" in azioni
+        assert "release" in azioni
 
-    def test_press_button_correct_name(self):
+    def test_press_button_nome_corretto(self):
         self.gpio.press_button("left", 0.01)
-        press_events = [e for e in self.gpio.log if e["action"] == "press"]
-        assert press_events[0]["button"] == "left"
+        eventi_press = [e for e in self.gpio.log if e["action"] == "press"]
+        assert eventi_press[0]["button"] == "left"
 
-    def test_press_duration_clamped_to_max(self):
+    def test_durata_pressione_limitata_al_massimo(self):
         self.gpio.press_button("forward", MAX_PRESS_TIMEOUT + 100)
-        press_events = [e for e in self.gpio.log if e["action"] == "press"]
-        assert press_events[0]["duration"] <= MAX_PRESS_TIMEOUT
+        eventi_press = [e for e in self.gpio.log if e["action"] == "press"]
+        assert eventi_press[0]["duration"] <= MAX_PRESS_TIMEOUT
 
-    def test_press_duration_clamped_to_zero(self):
+    def test_durata_pressione_limitata_a_zero(self):
         self.gpio.press_button("forward", -1.0)
-        press_events = [e for e in self.gpio.log if e["action"] == "press"]
-        assert press_events[0]["duration"] == 0.0
+        eventi_press = [e for e in self.gpio.log if e["action"] == "press"]
+        assert eventi_press[0]["duration"] == 0.0
 
-    def test_stop_all_logs_event(self):
+    def test_stop_all_registra_evento(self):
         self.gpio.stop_all()
-        actions = [e["action"] for e in self.gpio.log]
-        assert "stop_all" in actions
+        azioni = [e["action"] for e in self.gpio.log]
+        assert "stop_all" in azioni
 
-    def test_multiple_buttons(self):
+    def test_pulsanti_multipli(self):
         for btn in ["forward", "left", "right", "back"]:
             self.gpio.press_button(btn, 0.0)
-        btns_pressed = [e["button"] for e in self.gpio.log if e["action"] == "press"]
-        assert set(btns_pressed) == {"forward", "left", "right", "back"}
+        pulsanti_premuti = [e["button"] for e in self.gpio.log if e["action"] == "press"]
+        assert set(pulsanti_premuti) == {"forward", "left", "right", "back"}
 
-    def test_thread_safety(self):
-        """Multiple threads pressing buttons simultaneously should not crash."""
-        def press(btn):
+    def test_sicurezza_thread(self):
+        """Più thread che premono pulsanti contemporaneamente non devono crashare."""
+        def premi(btn):
             self.gpio.press_button(btn, 0.01)
 
-        threads = [threading.Thread(target=press, args=(b,))
-                   for b in ["forward", "left", "right"]]
-        for t in threads:
+        thread_list = [threading.Thread(target=premi, args=(b,))
+                       for b in ["forward", "left", "right"]]
+        for t in thread_list:
             t.start()
-        for t in threads:
+        for t in thread_list:
             t.join()
 
-        press_count = sum(1 for e in self.gpio.log if e["action"] == "press")
-        assert press_count == 3
+        contatore_press = sum(1 for e in self.gpio.log if e["action"] == "press")
+        assert contatore_press == 3
 
-    def test_stop_all_clears_active(self):
-        """stop_all should clear the active set."""
-        self.gpio._active.add("forward")
+    def test_stop_all_svuota_attivi(self):
+        """stop_all deve svuotare l'insieme degli attivi."""
+        self.gpio._attivi.add("forward")
         self.gpio.stop_all()
-        assert len(self.gpio._active) == 0
+        assert len(self.gpio._attivi) == 0
+

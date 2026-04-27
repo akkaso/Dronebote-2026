@@ -1,69 +1,70 @@
-DroneBot 2026 – System Flowchart
-=================================
+DroneBot 2026 – Diagramma di Flusso del Sistema
+================================================
 
-[START]
+[INIZIO]
    |
    v
-[PC: Open video source]
-   |  (RTSP / HTTP / file / camera / fallback: sample_video.mp4 / sample_frames/)
+[PC: Apri sorgente video]
+   |  (RTSP / HTTP / file / telecamera / riserva: sample_video.mp4 / sample_frames/)
    |
    v
-[PC: Read frame]
+[PC: Leggi frame]
    |
-   +--[no frame]---> [END / reconnect]
-   |
-   v
-[PC: Detect fire (HSV threshold + morphology + contour)]
-   |
-   +--[no fire]---> [send cmd=stop, duration=0]
+   +--[nessun frame]---> [FINE / riconnetti]
    |
    v
-[PC: Estimate centroid of fire blob]
+[PC: Rileva fuoco (soglia HSV + morfologia + contorni)]
+   |
+   +--[nessun fuoco]---> [invia cmd=stop, durata=0]
    |
    v
-[PC: ArUco detection (optional pose estimation)]
+[PC: Stima centroide del blob di fuoco]
    |
    v
-[PC: PID controller]
-   |  error = frame_centre_x - fire_centroid_x
-   |  pid.update(error, dt)
+[PC: Rilevamento ArUco (stima posa opzionale)]
    |
    v
-[PC: navigation.decide_command(pid_output)]
-   |  -> { cmd: forward | left | right | stop, duration: float }
+[PC: Controllore PID]
+   |  errore = centro_frame_x - centroide_fuoco_x
+   |  pid.aggiorna(errore, dt)
    |
    v
-[PC: ws_client.send_command(msg)]
-   |  (with msg_id, ack wait, retry on failure, heartbeat)
+[PC: navigazione.decidi_comando(output_pid)]
+   |  -> { cmd: avanti | sinistra | destra | stop, durata: float }
    |
    v
-[Pi: WebSocket server receives JSON command]
-   |
-   +--[cmd == emergency_stop]--> [gpio.stop_all(); set ESTOP flag; ignore further movement]
-   |
-   +--[cmd == heartbeat / ping]--> [send pong; continue]
+[PC: client_ws.invia_comando(msg)]
+   |  (con msg_id, attesa ACK, retry su fallimento, heartbeat)
    |
    v
-[Pi: gpio_controller.press_button(cmd, duration)]
-   |  (thread-safe; real RPi.GPIO or MockGPIO)
+[Pi: Server WebSocket riceve comando JSON]
+   |
+   +--[cmd == emergency_stop]--> [gpio.ferma_tutto(); imposta flag ESTOP; ignora movimento]
+   |
+   +--[cmd == heartbeat / ping]--> [invia pong; continua]
    |
    v
-[Pi: send ACK { msg_id, status: ok }]
+[Pi: gpio_controller.premi_pulsante(cmd, durata)]
+   |  (thread-safe; RPi.GPIO reale o GPIOMock)
    |
    v
-[PC: receive ACK; log]
+[Pi: invia ACK { msg_id, stato: ok }]
    |
    v
-[PC: save debug frame with overlays to pc/debug/]
+[PC: riceve ACK; registra log]
    |
    v
-[LOOP -> Read next frame]
+[PC: salva frame debug con overlay in pc/debug/]
+   |
+   v
+[LOOP -> Leggi frame successivo]
 
-=================================
-Emergency Stop path (any time):
-  Pi receives { "cmd": "emergency_stop" }
-    -> stop_all()
+================================================
+Percorso di arresto emergenza (in qualsiasi momento):
+  Pi riceve { "cmd": "emergency_stop" }
+    -> ferma_tutto()
     -> ESTOP = True
-    -> all subsequent movement commands rejected (ACK with status=rejected)
-    -> restart process to resume
-=================================
+    -> tutti i comandi di movimento successivi rifiutati (ACK stato=rifiutato)
+    -> riavviare il processo per riprendere
+================================================
+

@@ -1,113 +1,114 @@
-DroneBot 2026 – Pseudocode
-==========================
+DroneBot 2026 – Pseudocodice
+============================
 
-── PC SIDE ────────────────────────────────────────────────────────────
+── LATO PC ────────────────────────────────────────────────────────────
 
-PROCEDURE vision_loop(source, ws_url, config):
-    pid    ← PIDController(kp, ki, kd)
-    aruco  ← ArucoDetector()
-    ws     ← WSClient(ws_url)
-    cap    ← open_video(source) OR fallback_video()
-    timer  ← FPSTimer()
+PROCEDURA loop_visione(sorgente, ws_url, config):
+    pid    ← ControllatorePID(kp, ki, kd)
+    aruco  ← RilevatorAruco()
+    ws     ← ClientWS(ws_url)
+    cap    ← apri_video(sorgente) OPPURE video_riserva()
+    timer  ← TimerFPS()
 
-    LOOP forever:
-        frame ← cap.read()
-        IF frame is None:
-            BREAK
+    LOOP per sempre:
+        frame ← cap.leggi()
+        SE frame è None:
+            INTERROMPI
 
         dt ← timer.tick()
 
-        fire_found, centroid, mask ← detect_fire(frame, hsv_lower, hsv_upper)
+        fuoco_trovato, centroide, maschera ← rileva_fuoco(frame, hsv_min, hsv_max)
 
-        IF fire_found:
-            error ← centroid.x - frame_width / 2
-        ELSE:
-            error ← 0
+        SE fuoco_trovato:
+            errore ← centroide.x - larghezza_frame / 2
+        ALTRIMENTI:
+            errore ← 0
             pid.reset()
 
-        pid_out ← pid.update(error, dt)
+        output_pid ← pid.aggiorna(errore, dt)
 
-        command ← decide_command(pid_out, fire_found)
+        comando ← decidi_comando(output_pid, fuoco_trovato)
 
-        corners, ids ← aruco.detect(frame)
+        angoli, id ← aruco.rileva(frame)
 
-        AWAIT ws.send_command(command)
+        ATTENDI ws.invia_comando(comando)
 
-        debug_frame ← annotate(frame, centroid, command, fps)
-        IF debug_save:
-            save(debug_frame)
+        frame_debug ← annota(frame, centroide, comando, fps)
+        SE salva_debug:
+            salva(frame_debug)
 
-        IF key == 'q': BREAK
+        SE tasto == 'q': INTERROMPI
 
-    ws.close()
-    cap.release()
-
-
-PROCEDURE detect_fire(frame, lower, upper):
-    hsv  ← cv2.cvtColor(frame, HSV)
-    mask ← cv2.inRange(hsv, lower, upper)
-    mask ← morphology_open(mask)
-    mask ← morphology_dilate(mask)
-    contours ← findContours(mask)
-    IF contours is empty OR max_area < min_area:
-        RETURN False, None, mask
-    centroid ← moments(largest_contour)
-    RETURN True, centroid, mask
+    ws.chiudi()
+    cap.rilascia()
 
 
-PROCEDURE decide_command(pid_out, fire_found):
-    IF NOT fire_found:
-        RETURN { cmd: "stop", duration: 0 }
-    IF |pid_out| < turn_threshold:
-        RETURN { cmd: "forward", duration: base_duration }
-    ELIF pid_out > 0:
-        RETURN { cmd: "right",   duration: proportional_duration }
-    ELSE:
-        RETURN { cmd: "left",    duration: proportional_duration }
+PROCEDURA rileva_fuoco(frame, minimo, massimo):
+    hsv   ← cv2.cvtColor(frame, HSV)
+    maschera ← cv2.inRange(hsv, minimo, massimo)
+    maschera ← morfologia_apertura(maschera)
+    maschera ← morfologia_dilatazione(maschera)
+    contorni ← trovaCont orni(maschera)
+    SE contorni vuoti OPPURE area_max < area_min:
+        RESTITUISCI False, None, maschera
+    centroide ← momenti(contorno_più_grande)
+    RESTITUISCI True, centroide, maschera
 
 
-── PI SIDE ────────────────────────────────────────────────────────────
+PROCEDURA decidi_comando(output_pid, fuoco_trovato):
+    SE NON fuoco_trovato:
+        RESTITUISCI { cmd: "stop", durata: 0 }
+    SE |output_pid| < soglia_svolta:
+        RESTITUISCI { cmd: "avanti",   durata: durata_base }
+    ALTRIMENTI SE output_pid > 0:
+        RESTITUISCI { cmd: "destra",   durata: durata_proporzionale }
+    ALTRIMENTI:
+        RESTITUISCI { cmd: "sinistra", durata: durata_proporzionale }
 
-PROCEDURE ws_server(host, port, mock):
-    gpio  ← MockGPIO() IF mock ELSE RealGPIO()
+
+── LATO PI ────────────────────────────────────────────────────────────
+
+PROCEDURA server_ws(host, porta, mock):
+    gpio  ← GPIOMock() SE mock ALTRIMENTI GPIOReale()
     estop ← False
 
-    LISTEN on host:port
-    FOR EACH connected client:
-        FOR EACH message:
-            msg ← parse_json(message)
+    ASCOLTA su host:porta
+    PER OGNI client connesso:
+        PER OGNI messaggio:
+            msg ← analizza_json(messaggio)
 
-            IF msg.cmd == "emergency_stop":
-                gpio.stop_all()
+            SE msg.cmd == "emergency_stop":
+                gpio.ferma_tutto()
                 estop ← True
-                SEND ACK(ok)
-                CONTINUE
+                INVIA ACK(ok)
+                CONTINUA
 
-            IF msg.cmd == "heartbeat":
-                SEND ACK(ok)
-                CONTINUE
+            SE msg.cmd == "heartbeat":
+                INVIA ACK(ok)
+                CONTINUA
 
-            IF estop:
-                SEND ACK(rejected)
-                CONTINUE
+            SE estop:
+                INVIA ACK(rifiutato)
+                CONTINUA
 
-            IF msg.cmd IN movement_commands:
-                RUN_IN_THREAD gpio.press_button(msg.cmd, msg.duration)
-                SEND ACK(ok)
-            ELSE:
-                SEND ACK(rejected)
-
-
-PROCEDURE press_button(button, duration):
-    CLAMP duration to [0, MAX_PRESS_TIMEOUT]
-    WITH lock:
-        set_pin(button, HIGH)
-    SLEEP(duration)
-    WITH lock:
-        set_pin(button, LOW)
+            SE msg.cmd IN comandi_movimento:
+                ESEGUI_IN_THREAD gpio.premi_pulsante(msg.cmd, msg.durata)
+                INVIA ACK(ok)
+            ALTRIMENTI:
+                INVIA ACK(rifiutato)
 
 
-PROCEDURE stop_all():
-    WITH lock:
-        FOR EACH pin:
-            set_pin(pin, LOW)
+PROCEDURA premi_pulsante(pulsante, durata):
+    LIMITA durata a [0, TIMEOUT_MAX_PRESSIONE]
+    CON lock:
+        imposta_pin(pulsante, ALTO)
+    ATTENDI(durata)
+    CON lock:
+        imposta_pin(pulsante, BASSO)
+
+
+PROCEDURA ferma_tutto():
+    CON lock:
+        PER OGNI pin:
+            imposta_pin(pin, BASSO)
+

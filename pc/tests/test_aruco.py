@@ -1,4 +1,4 @@
-"""Tests for the ArUco detector (no camera hardware required)."""
+"""Test per il rilevatore ArUco (nessun hardware telecamera necessario)."""
 
 import sys
 from pathlib import Path
@@ -11,81 +11,82 @@ import pytest
 from pc.aruco_detector import ArucoDetector
 
 
-def _make_aruco_frame(marker_id: int = 0, img_size: int = 300) -> np.ndarray:
-    """Create a white BGR frame with one ArUco marker embedded."""
-    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-    marker_img = np.zeros((200, 200), dtype=np.uint8)
-    cv2.aruco.generateImageMarker(dictionary, marker_id, 200, marker_img, 1)
+def _crea_frame_aruco(marker_id: int = 0, dim_immagine: int = 300) -> np.ndarray:
+    """Crea un frame BGR bianco con un marker ArUco incorporato."""
+    dizionario = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    img_marker = np.zeros((200, 200), dtype=np.uint8)
+    cv2.aruco.generateImageMarker(dizionario, marker_id, 200, img_marker, 1)
 
-    frame = np.ones((img_size, img_size, 3), dtype=np.uint8) * 255
-    offset = (img_size - 200) // 2
+    frame = np.ones((dim_immagine, dim_immagine, 3), dtype=np.uint8) * 255
+    offset = (dim_immagine - 200) // 2
     frame[offset : offset + 200, offset : offset + 200] = cv2.cvtColor(
-        marker_img, cv2.COLOR_GRAY2BGR
+        img_marker, cv2.COLOR_GRAY2BGR
     )
     return frame
 
 
 class TestArucoDetector:
-    def test_no_marker_in_blank_frame(self):
+    def test_nessun_marker_in_frame_vuoto(self):
         det = ArucoDetector()
-        blank = np.ones((300, 300, 3), dtype=np.uint8) * 200
-        corners, ids, rvecs, tvecs = det.detect(blank)
+        vuoto = np.ones((300, 300, 3), dtype=np.uint8) * 200
+        corners, ids, rvecs, tvecs = det.detect(vuoto)
         assert len(ids) == 0
         assert rvecs is None
 
-    def test_detects_embedded_marker(self):
+    def test_rileva_marker_incorporato(self):
         det = ArucoDetector()
-        frame = _make_aruco_frame(marker_id=0)
+        frame = _crea_frame_aruco(marker_id=0)
         corners, ids, rvecs, tvecs = det.detect(frame)
         assert 0 in ids
 
-    def test_returns_correct_marker_id(self):
+    def test_restituisce_id_marker_corretto(self):
         det = ArucoDetector()
         for mid in [0, 5, 10]:
-            frame = _make_aruco_frame(marker_id=mid)
+            frame = _crea_frame_aruco(marker_id=mid)
             _, ids, _, _ = det.detect(frame)
-            assert mid in ids, f"Expected marker id {mid} but got {ids}"
+            assert mid in ids, f"Atteso marker id {mid} ma ottenuto {ids}"
 
-    def test_corners_shape(self):
+    def test_forma_corners(self):
         det = ArucoDetector()
-        frame = _make_aruco_frame(marker_id=0)
+        frame = _crea_frame_aruco(marker_id=0)
         corners, ids, _, _ = det.detect(frame)
         assert len(corners) == len(ids)
         for c in corners:
             assert c.shape == (1, 4, 2)
 
-    def test_no_pose_without_camera_matrix(self):
-        """Without camera_matrix, pose estimation should be skipped."""
+    def test_nessuna_posa_senza_matrice_telecamera(self):
+        """Senza camera_matrix, la stima della posa deve essere saltata."""
         det = ArucoDetector(camera_matrix=None)
-        frame = _make_aruco_frame()
+        frame = _crea_frame_aruco()
         _, ids, rvecs, tvecs = det.detect(frame)
         assert rvecs is None
         assert tvecs is None
 
-    def test_pose_with_camera_matrix(self):
-        """With camera_matrix provided, rvecs/tvecs should be returned."""
-        img_size = 300
-        fx = fy = img_size
-        cx = cy = img_size / 2
-        camera_matrix = np.array(
+    def test_posa_con_matrice_telecamera(self):
+        """Con camera_matrix fornita, rvecs/tvecs devono essere restituiti."""
+        dim = 300
+        fx = fy = dim
+        cx = cy = dim / 2
+        matrice_cam = np.array(
             [[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float64
         )
-        det = ArucoDetector(camera_matrix=camera_matrix)
-        frame = _make_aruco_frame()
+        det = ArucoDetector(camera_matrix=matrice_cam)
+        frame = _crea_frame_aruco()
         _, ids, rvecs, tvecs = det.detect(frame)
-        if ids:  # marker was found
+        if ids:  # marker trovato
             assert rvecs is not None
             assert tvecs is not None
 
-    def test_draw_does_not_crash(self):
+    def test_draw_non_crasha(self):
         det = ArucoDetector()
-        frame = _make_aruco_frame()
+        frame = _crea_frame_aruco()
         corners, ids, rvecs, tvecs = det.detect(frame)
         out = det.draw(frame, corners, ids, rvecs, tvecs)
         assert out.shape == frame.shape
 
-    def test_draw_on_empty(self):
+    def test_draw_su_frame_vuoto(self):
         det = ArucoDetector()
-        blank = np.ones((200, 200, 3), dtype=np.uint8) * 128
-        out = det.draw(blank, [], [], None, None)
-        assert out.shape == blank.shape
+        vuoto = np.ones((200, 200, 3), dtype=np.uint8) * 128
+        out = det.draw(vuoto, [], [], None, None)
+        assert out.shape == vuoto.shape
+

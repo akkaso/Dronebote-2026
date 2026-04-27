@@ -1,11 +1,11 @@
-"""Shared utility helpers for the PC side."""
+"""Funzioni di supporto condivise per il lato PC."""
 
 import logging
 import time
 
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """Return a configured logger."""
+    """Restituisce un logger configurato."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()
@@ -18,21 +18,22 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
 
 
 def clamp(value: float, low: float, high: float) -> float:
-    """Clamp *value* to [low, high]."""
+    """Limita *value* all'intervallo [low, high]."""
     return max(low, min(high, value))
 
 
 class FPSTimer:
-    """Simple helper to measure frames per second."""
+    """Helper semplice per misurare i fotogrammi al secondo."""
 
     def __init__(self) -> None:
-        self._last = time.monotonic()
+        self._ultimo = time.monotonic()
         self.fps = 0.0
 
     def tick(self) -> float:
-        """Call once per frame; returns current dt in seconds."""
-        now = time.monotonic()
-        dt = now - self._last
-        self._last = now
+        """Chiamare una volta per frame; restituisce il dt corrente in secondi."""
+        ora = time.monotonic()
+        dt = ora - self._ultimo
+        self._ultimo = ora
         self.fps = 1.0 / dt if dt > 0 else 0.0
         return dt
+

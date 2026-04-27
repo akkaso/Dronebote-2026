@@ -1,20 +1,20 @@
-"""PID controller with anti-windup for DroneBot 2026."""
+"""Controllore PID con anti-windup per DroneBot 2026."""
 
 from pc.utils import clamp
 
 
 class PIDController:
     """
-    Discrete PID controller.
+    Controllore PID discreto.
 
-    Parameters
-    ----------
+    Parametri
+    ---------
     kp, ki, kd : float
-        Proportional, integral, derivative gains.
+        Guadagni proporzionale, integrale, derivativo.
     windup_limit : float
-        Maximum absolute value of the integral accumulator (anti-windup).
-    output_limit : float or None
-        If set, clamp the final output to [-output_limit, output_limit].
+        Valore assoluto massimo dell'accumulatore integrale (anti-windup).
+    output_limit : float oppure None
+        Se impostato, limita l'uscita finale a [-output_limit, output_limit].
     """
 
     def __init__(
@@ -31,37 +31,38 @@ class PIDController:
         self.windup_limit = windup_limit
         self.output_limit = output_limit
 
-        self._integral: float = 0.0
-        self._prev_error: float = 0.0
+        self._integrale: float = 0.0
+        self._errore_prec: float = 0.0
 
     def reset(self) -> None:
-        """Reset internal state (call when switching targets)."""
-        self._integral = 0.0
-        self._prev_error = 0.0
+        """Azzera lo stato interno (chiamare quando si cambia bersaglio)."""
+        self._integrale = 0.0
+        self._errore_prec = 0.0
 
     def update(self, error: float, dt: float) -> float:
         """
-        Compute the PID output for *error* over time-step *dt* (seconds).
+        Calcola l'uscita PID per *error* nel passo temporale *dt* (secondi).
 
-        Returns the control output (positive → turn right, negative → turn left
-        in the navigation convention used by this project).
+        Restituisce il segnale di controllo (positivo → gira a destra,
+        negativo → gira a sinistra nella convenzione di navigazione del progetto).
         """
         if dt <= 0:
-            dt = 1e-6  # avoid division by zero
+            dt = 1e-6  # evita divisione per zero
 
-        # Proportional term
+        # Termine proporzionale
         p = self.kp * error
 
-        # Integral term with anti-windup clamp
-        self._integral += error * dt
-        self._integral = clamp(self._integral, -self.windup_limit, self.windup_limit)
-        i = self.ki * self._integral
+        # Termine integrale con saturazione anti-windup
+        self._integrale += error * dt
+        self._integrale = clamp(self._integrale, -self.windup_limit, self.windup_limit)
+        i = self.ki * self._integrale
 
-        # Derivative term (backward difference)
-        d = self.kd * (error - self._prev_error) / dt
-        self._prev_error = error
+        # Termine derivativo (differenza all'indietro)
+        d = self.kd * (error - self._errore_prec) / dt
+        self._errore_prec = error
 
-        output = p + i + d
+        uscita = p + i + d
         if self.output_limit is not None:
-            output = clamp(output, -self.output_limit, self.output_limit)
-        return output
+            uscita = clamp(uscita, -self.output_limit, self.output_limit)
+        return uscita
+

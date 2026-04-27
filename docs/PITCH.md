@@ -1,56 +1,57 @@
-# DroneBot 2026 – Project Pitch
+# DroneBot 2026 – Presentazione del Progetto
 
-## The Problem
+## Il Problema
 
-In emergency situations (fires, hazardous environments), first responders need a way
-to quickly locate and approach a fire source without putting humans at risk.
+In situazioni di emergenza (incendi, ambienti pericolosi), i soccorritori hanno bisogno di un modo
+per localizzare e raggiungere rapidamente una sorgente di fuoco senza mettere a rischio vite umane.
 
-## Our Solution
+## La Nostra Soluzione
 
-**DroneBot 2026** is an autonomous ground rover that:
+**DroneBot 2026** è un rover terrestre autonomo che:
 
-1. **Sees** – uses a connected camera and OpenCV to detect fire in real time using
-   colour-based HSV segmentation and morphological filtering.
-2. **Thinks** – a PID controller computes lateral correction; a navigation module
-   converts this to discrete motor commands (forward / left / right).
-3. **Acts** – a Raspberry Pi receives commands via WebSocket and drives the rover
-   motors through GPIO.
+1. **Vede** – utilizza una telecamera collegata e OpenCV per rilevare il fuoco in tempo reale tramite
+   segmentazione del colore in spazio HSV e filtraggio morfologico.
+2. **Ragiona** – un controllore PID calcola la correzione laterale; un modulo di navigazione
+   la converte in comandi discreti per i motori (avanti / sinistra / destra).
+3. **Agisce** – un Raspberry Pi riceve i comandi via WebSocket e aziona i motori del rover
+   tramite GPIO.
 
-## Key Features
+## Caratteristiche Principali
 
-| Feature | Detail |
-|---------|--------|
-| Real-time fire detection | HSV + morphology + contour, ~30 fps |
-| ArUco pose estimation | Localise the rover relative to markers |
-| PID with anti-windup | Smooth, stable lateral correction |
-| Emergency stop | Instant halt, rejects further movement |
-| Mock mode | Full pipeline testable without any hardware |
-| WebSocket ack/retry | Reliable command delivery |
-| Docker ready | One command to spin up both services |
+| Funzionalità | Dettaglio |
+|-------------|-----------|
+| Rilevamento fuoco in tempo reale | HSV + morfologia + contorni, ~30 fps |
+| Stima posa ArUco | Localizzazione del rover rispetto ai marker |
+| PID con anti-windup | Correzione laterale fluida e stabile |
+| Arresto di emergenza | Fermata immediata, rifiuto comandi successivi |
+| Modalità mock | Pipeline completa testabile senza hardware |
+| WebSocket ack/retry | Consegna affidabile dei comandi |
+| Docker ready | Un solo comando per avviare entrambi i servizi |
 
-## Architecture
+## Architettura
 
 ```
-Camera → OpenCV (PC) → PID → WebSocket → RPi.GPIO → Motors
+Telecamera → OpenCV (PC) → PID → WebSocket → RPi.GPIO → Motori
 ```
 
-## Why Python 3.10+?
+## Perché Python 3.10+?
 
-- Structural pattern matching (future use)
-- Union types with `|` (clean type hints)
-- Widely available on Raspberry Pi OS Bookworm
+- Pattern matching strutturale (per utilizzi futuri)
+- Tipi unione con `|` (type hints più puliti)
+- Ampiamente disponibile su Raspberry Pi OS Bookworm
 
-## Competition Relevance
+## Rilevanza per la Competizione
 
-DroneBot 2026 demonstrates:
-- Sensor fusion (vision + pose markers)
-- Real-time control loops
-- Embedded Linux / GPIO programming
-- Reliable networked communication
+DroneBot 2026 dimostra:
+- Fusione sensoriale (visione + marker di posa)
+- Loop di controllo in tempo reale
+- Programmazione Linux embedded / GPIO
+- Comunicazione di rete affidabile
 
-## Roadmap
+## Sviluppi Futuri
 
-- [ ] 3D depth camera integration (RealSense)
-- [ ] Multi-fire source prioritisation
-- [ ] Autonomous return-to-base after extinguishing
-- [ ] ROS 2 integration
+- [ ] Integrazione telecamera di profondità 3D (RealSense)
+- [ ] Prioritizzazione di più sorgenti di fuoco
+- [ ] Ritorno autonomo alla base dopo l'estinzione
+- [ ] Integrazione con ROS 2
+
