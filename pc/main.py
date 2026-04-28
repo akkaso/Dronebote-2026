@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 import yaml
 
 from fire_detector import FireDetector
@@ -152,7 +153,6 @@ class MissionController:
     # ------------------------------------------------------------------
     @staticmethod
     def _annotate_fire(frame: np.ndarray, fire) -> None:  # type: ignore[annotation-unchecked]
-        import numpy as np
         color = (0, 255, 0) if fire.detected else (0, 0, 255)
         label = f"FIRE {'OK' if fire.detected else 'searching'} area={fire.area:.0f}"
         cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
@@ -178,8 +178,6 @@ class MissionController:
 
 # ── Entry point ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import numpy as np  # noqa: F401 – needed for type annotations at runtime
-
     parser = argparse.ArgumentParser(description="DroneBot 2026 – mission controller")
     parser.add_argument(
         "--config",

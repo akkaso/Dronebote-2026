@@ -80,6 +80,9 @@ class RoverServer:
         self._setup_gpio()
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Binding to all interfaces is intentional: the Pi rover server must
+        # accept UDP commands from the PC on whatever network interface the
+        # local competition Wi-Fi is attached to.  Deploy on a trusted LAN only.
         self._sock.bind((self._host, self._port))
         self._sock.settimeout(1.0)
 
