@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  pi-server:
+    build:
+      context: ./pi
+      dockerfile: Dockerfile
+    container_name: dronbot_pi
+    ports:
+      - "8765:8765"
+    environment:
+      - MOCK=1
+    command: ["python3", "pi_ws_server.py", "--host", "0.0.0.0", "--port", "8765", "--mock"]
+
+  pc-client:
+    build:
+      context: ./pc
+      dockerfile: Dockerfile
+    container_name: dronbot_pc
+    depends_on:
+      - pi-server
+    volumes:
+      - ./sample_video.mp4:/app/sample_video.mp4:ro
+      - ./pc/debug:/app/debug
+    environment:
+      - WS_URL=ws://pi-server:8765
+    command: [
+      "python3", "vision_client.py",
+      "--source", "sample_video.mp4",
+      "--ws", "ws://pi-server:8765",
+      "--mock"
+    ]

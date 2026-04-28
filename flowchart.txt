@@ -1,0 +1,70 @@
+DroneBot 2026 – Diagramma di Flusso del Sistema
+================================================
+
+[INIZIO]
+   |
+   v
+[PC: Apri sorgente video]
+   |  (RTSP / HTTP / file / telecamera / riserva: sample_video.mp4 / sample_frames/)
+   |
+   v
+[PC: Leggi frame]
+   |
+   +--[nessun frame]---> [FINE / riconnetti]
+   |
+   v
+[PC: Rileva fuoco (soglia HSV + morfologia + contorni)]
+   |
+   +--[nessun fuoco]---> [invia cmd=stop, durata=0]
+   |
+   v
+[PC: Stima centroide del blob di fuoco]
+   |
+   v
+[PC: Rilevamento ArUco (stima posa opzionale)]
+   |
+   v
+[PC: Controllore PID]
+   |  errore = centro_frame_x - centroide_fuoco_x
+   |  pid.aggiorna(errore, dt)
+   |
+   v
+[PC: navigazione.decidi_comando(output_pid)]
+   |  -> { cmd: avanti | sinistra | destra | stop, durata: float }
+   |
+   v
+[PC: client_ws.invia_comando(msg)]
+   |  (con msg_id, attesa ACK, retry su fallimento, heartbeat)
+   |
+   v
+[Pi: Server WebSocket riceve comando JSON]
+   |
+   +--[cmd == emergency_stop]--> [gpio.ferma_tutto(); imposta flag ESTOP; ignora movimento]
+   |
+   +--[cmd == heartbeat / ping]--> [invia pong; continua]
+   |
+   v
+[Pi: gpio_controller.premi_pulsante(cmd, durata)]
+   |  (thread-safe; RPi.GPIO reale o GPIOMock)
+   |
+   v
+[Pi: invia ACK { msg_id, stato: ok }]
+   |
+   v
+[PC: riceve ACK; registra log]
+   |
+   v
+[PC: salva frame debug con overlay in pc/debug/]
+   |
+   v
+[LOOP -> Leggi frame successivo]
+
+================================================
+Percorso di arresto emergenza (in qualsiasi momento):
+  Pi riceve { "cmd": "emergency_stop" }
+    -> ferma_tutto()
+    -> ESTOP = True
+    -> tutti i comandi di movimento successivi rifiutati (ACK stato=rifiutato)
+    -> riavviare il processo per riprendere
+================================================
+

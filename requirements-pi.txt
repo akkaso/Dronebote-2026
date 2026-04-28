@@ -1,0 +1,4 @@
+# Raspberry Pi-side dependencies
+websockets>=12.0
+RPi.GPIO>=0.7.1; sys_platform == "linux"
+pytest>=7.4.0

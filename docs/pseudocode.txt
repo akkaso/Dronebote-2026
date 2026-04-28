@@ -1,0 +1,114 @@
+DroneBot 2026 – Pseudocodice
+============================
+
+── LATO PC ────────────────────────────────────────────────────────────
+
+PROCEDURA loop_visione(sorgente, ws_url, config):
+    pid    ← ControllatorePID(kp, ki, kd)
+    aruco  ← RilevatorAruco()
+    ws     ← ClientWS(ws_url)
+    cap    ← apri_video(sorgente) OPPURE video_riserva()
+    timer  ← TimerFPS()
+
+    LOOP per sempre:
+        frame ← cap.leggi()
+        SE frame è None:
+            INTERROMPI
+
+        dt ← timer.tick()
+
+        fuoco_trovato, centroide, maschera ← rileva_fuoco(frame, hsv_min, hsv_max)
+
+        SE fuoco_trovato:
+            errore ← centroide.x - larghezza_frame / 2
+        ALTRIMENTI:
+            errore ← 0
+            pid.reset()
+
+        output_pid ← pid.aggiorna(errore, dt)
+
+        comando ← decidi_comando(output_pid, fuoco_trovato)
+
+        angoli, id ← aruco.rileva(frame)
+
+        ATTENDI ws.invia_comando(comando)
+
+        frame_debug ← annota(frame, centroide, comando, fps)
+        SE salva_debug:
+            salva(frame_debug)
+
+        SE tasto == 'q': INTERROMPI
+
+    ws.chiudi()
+    cap.rilascia()
+
+
+PROCEDURA rileva_fuoco(frame, minimo, massimo):
+    hsv   ← cv2.cvtColor(frame, HSV)
+    maschera ← cv2.inRange(hsv, minimo, massimo)
+    maschera ← morfologia_apertura(maschera)
+    maschera ← morfologia_dilatazione(maschera)
+    contorni ← trovaCont orni(maschera)
+    SE contorni vuoti OPPURE area_max < area_min:
+        RESTITUISCI False, None, maschera
+    centroide ← momenti(contorno_più_grande)
+    RESTITUISCI True, centroide, maschera
+
+
+PROCEDURA decidi_comando(output_pid, fuoco_trovato):
+    SE NON fuoco_trovato:
+        RESTITUISCI { cmd: "stop", durata: 0 }
+    SE |output_pid| < soglia_svolta:
+        RESTITUISCI { cmd: "avanti",   durata: durata_base }
+    ALTRIMENTI SE output_pid > 0:
+        RESTITUISCI { cmd: "destra",   durata: durata_proporzionale }
+    ALTRIMENTI:
+        RESTITUISCI { cmd: "sinistra", durata: durata_proporzionale }
+
+
+── LATO PI ────────────────────────────────────────────────────────────
+
+PROCEDURA server_ws(host, porta, mock):
+    gpio  ← GPIOMock() SE mock ALTRIMENTI GPIOReale()
+    estop ← False
+
+    ASCOLTA su host:porta
+    PER OGNI client connesso:
+        PER OGNI messaggio:
+            msg ← analizza_json(messaggio)
+
+            SE msg.cmd == "emergency_stop":
+                gpio.ferma_tutto()
+                estop ← True
+                INVIA ACK(ok)
+                CONTINUA
+
+            SE msg.cmd == "heartbeat":
+                INVIA ACK(ok)
+                CONTINUA
+
+            SE estop:
+                INVIA ACK(rifiutato)
+                CONTINUA
+
+            SE msg.cmd IN comandi_movimento:
+                ESEGUI_IN_THREAD gpio.premi_pulsante(msg.cmd, msg.durata)
+                INVIA ACK(ok)
+            ALTRIMENTI:
+                INVIA ACK(rifiutato)
+
+
+PROCEDURA premi_pulsante(pulsante, durata):
+    LIMITA durata a [0, TIMEOUT_MAX_PRESSIONE]
+    CON lock:
+        imposta_pin(pulsante, ALTO)
+    ATTENDI(durata)
+    CON lock:
+        imposta_pin(pulsante, BASSO)
+
+
+PROCEDURA ferma_tutto():
+    CON lock:
+        PER OGNI pin:
+            imposta_pin(pin, BASSO)
+
